@@ -11,10 +11,16 @@ jobs:
       - name: Install VS2015 Build Tools
         shell: pwsh
         run: |
+          Get-ChildItem "HKLM:SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall","HKLM:SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" -ErrorAction SilentlyContinue |
+            Where-Object { $_.GetValue("DisplayName") -match "Visual C\+\+ (2015|2017|2019|2022)" } |
+            ForEach-Object { $k = $_.PSChildName; if ($k -match '^\{') { Write-Host "Removing $k"; Start-Process msiexec -ArgumentList "/x $k /qn /norestart" -Wait } }
           Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?LinkId=691126" -OutFile "$env:TEMP\vcbt.exe"
-          Start-Process -FilePath "$env:TEMP\vcbt.exe" -ArgumentList '/Passive','/NoRestart','/Log',"$env:TEMP\vcbt.log" -Wait
+          $p = Start-Process -FilePath "$env:TEMP\vcbt.exe" -ArgumentList '/Passive','/NoRestart' -Wait -PassThru
           $cl = Get-ChildItem "C:\Program Files (x86)\Microsoft Visual C++ Build Tools\VC\bin\cl.exe","C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $cl) { Get-Content "$env:TEMP\vcbt.log" -Tail 80; Write-Error "cl.exe not found after VS2015 Build Tools install"; exit 1 }
+          if (-not $cl) {
+            Get-ChildItem "$env:TEMP\vcbt*.log" | ForEach-Object { Write-Host "===== $($_.Name)"; Get-Content $_.FullName -Tail 25 -ErrorAction SilentlyContinue }
+            Write-Error "cl.exe not found after VS2015 Build Tools install"; exit 1
+          }
           Write-Host "cl.exe found: $($cl.FullName)"
       - name: Download 2008R2 patch
         run: curl -L -o 2008r2.patch https://github.com/user-attachments/files/33750020/mcp_http_transport_2008r2_fix.txt
