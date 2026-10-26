@@ -14,28 +14,17 @@ jobs:
       - name: Apply patch
         run: git apply 2008r2.patch
         working-directory: native_components/MCPHttpTransport
-      - name: Add Win7/2008R2 stubs
+      - name: Redirect Win8-only API to Win7 equivalent
         shell: pwsh
         working-directory: native_components/MCPHttpTransport
         run: |
-          @'
-          // stubs.cpp - совместимость статического CRT VS2022 с Windows 7 / Server 2008 R2
-          #include <windows.h>
-          extern "C" {
-          VOID WINAPI RtlUnwindEx(PVOID a, PVOID b, PVOID c, PVOID d, PVOID e, PVOID f)
-          {
-              typedef VOID (WINAPI *Fn)(PVOID, PVOID, PVOID, PVOID, PVOID, PVOID);
-              HMODULE m = GetModuleHandleW(L"ntdll.dll");
-              if (m) { Fn fn = (Fn)GetProcAddress(m, "RtlUnwindEx"); if (fn) { fn(a,b,c,d,e,f); return; } }
-              TerminateProcess(GetCurrentProcess(), 127);
+          if ("${{ matrix.arch }}" -eq "Win32") {
+            $alt = "/alternatename:_GetSystemTimePreciseAsFileTime@4=_GetSystemTimeAsFileTime@4"
+          } else {
+            $alt = "/alternatename:GetSystemTimePreciseAsFileTime=GetSystemTimeAsFileTime"
           }
-          VOID WINAPI GetSystemTimePreciseAsFileTime(LPFILETIME ft)
-          {
-              GetSystemTimeAsFileTime(ft);
-          }
-          }
-          '@ | Out-File -Encoding ascii stubs.cpp
-          Add-Content CMakeLists.txt "`ntarget_sources(MCPHttpTransport PRIVATE `${CMAKE_CURRENT_SOURCE_DIR}/stubs.cpp)"
+          Write-Host "Using: $alt"
+          Add-Content CMakeLists.txt "`ntarget_link_options(MCPHttpTransport PRIVATE `"$alt`")"
       - name: Configure (static CRT)
         run: cmake -B build -A ${{ matrix.arch }} -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
         working-directory: native_components/MCPHttpTransport
