@@ -7,7 +7,17 @@ jobs:
         arch: [x64, Win32]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
+      - name: Install VS2015 toolset (v140)
+        shell: pwsh
+        run: |
+          $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) { $installer = "C:\Program Files\Microsoft Visual Studio\Installer\vs_installer.exe" }
+          $installPath = & $vswhere -latest -property installationPath
+          Write-Host "Modifying $installPath"
+          & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.140 --quiet --wait --norestart
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Download 2008R2 patch
         run: curl -L -o 2008r2.patch https://github.com/user-attachments/files/33750020/mcp_http_transport_2008r2_fix.txt
         working-directory: native_components/MCPHttpTransport
@@ -21,7 +31,7 @@ jobs:
         run: cmake --build build --config Release
         working-directory: native_components/MCPHttpTransport
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: MCPHttpTransport-${{ matrix.arch }}-2008r2
           path: native_components/MCPHttpTransport/build/Release/MCPHttpTransport.dll
