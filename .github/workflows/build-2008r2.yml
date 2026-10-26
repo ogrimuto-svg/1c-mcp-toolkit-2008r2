@@ -5,19 +5,21 @@ jobs:
     strategy:
       matrix:
         arch: [x64, Win32]
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Install VS2015 toolset (v140)
+      - name: Install v140 toolset
         shell: pwsh
         run: |
           $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          if (-not (Test-Path $installer)) { $installer = "C:\Program Files\Microsoft Visual Studio\Installer\vs_installer.exe" }
           $installPath = & $vswhere -latest -property installationPath
-          Write-Host "Modifying $installPath"
+          Write-Host "Installing v140 into: $installPath"
           & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.140 --quiet --wait --norestart
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { Write-Error "vs_installer exited with $LASTEXITCODE"; exit 1 }
+          $check = & $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.140 -property installationPath
+          if (-not $check) { Write-Error "v140 toolset NOT installed - component not found after modify"; exit 1 }
+          Write-Host "v140 OK"
       - name: Download 2008R2 patch
         run: curl -L -o 2008r2.patch https://github.com/user-attachments/files/33750020/mcp_http_transport_2008r2_fix.txt
         working-directory: native_components/MCPHttpTransport
