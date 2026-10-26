@@ -8,18 +8,14 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Install v140 toolset
+      - name: Install VS2015 Build Tools
         shell: pwsh
         run: |
-          $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          $installPath = & $vswhere -latest -property installationPath
-          Write-Host "Installing v140 into: $installPath"
-          & $installer modify --installPath $installPath --add Microsoft.VisualStudio.Component.VC.140 --quiet --wait --norestart
-          if ($LASTEXITCODE -ne 0) { Write-Error "vs_installer exited with $LASTEXITCODE"; exit 1 }
-          $check = & $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.140 -property installationPath
-          if (-not $check) { Write-Error "v140 toolset NOT installed - component not found after modify"; exit 1 }
-          Write-Host "v140 OK"
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?LinkId=691126" -OutFile "$env:TEMP\vcbt.exe"
+          Start-Process -FilePath "$env:TEMP\vcbt.exe" -ArgumentList '/Passive','/NoRestart','/Log',"$env:TEMP\vcbt.log" -Wait
+          $cl = Get-ChildItem "C:\Program Files (x86)\Microsoft Visual C++ Build Tools\VC\bin\cl.exe","C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\cl.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $cl) { Get-Content "$env:TEMP\vcbt.log" -Tail 80; Write-Error "cl.exe not found after VS2015 Build Tools install"; exit 1 }
+          Write-Host "cl.exe found: $($cl.FullName)"
       - name: Download 2008R2 patch
         run: curl -L -o 2008r2.patch https://github.com/user-attachments/files/33750020/mcp_http_transport_2008r2_fix.txt
         working-directory: native_components/MCPHttpTransport
